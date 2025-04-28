@@ -1,0 +1,706 @@
+THis is the Backend Created in .NET webapi and You must learn it and remeber it so you can understand the front end routing
+
+
+using Microsoft.EntityFrameworkCore;
+using Project.Data;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Database Contexts
+builder.Services.AddDbContext<ApplicationDbContext>(options => 
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddDbContext<TimeTableDbContext>(options => 
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+var app = builder.Build();
+
+// Middleware pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseCors("AllowReactApp");
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+
+**Models
+using System.ComponentModel.DataAnnotations; // For [Key], [Required], etc.
+using System.ComponentModel.DataAnnotations.Schema; // For [Column]
+namespace Project.Models
+{
+    public class AppUser
+    {
+        [Key]
+        [EmailAddress]
+        [MaxLength(255)]
+        public string? Email { get; set; }
+        
+        public string? Name { get; set; }
+        
+        public string? Role { get; set; }
+        public string? Password { get; set; } // Note: In a real application, never store passwords in plain text
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Project.Models
+{
+    public class Lab
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Class { get; set; }
+        public string Branch { get; set; }
+        public string Name { get; set; }
+        public TimeSpan TimeSlot { get; set; }
+    }
+    public class LabDto
+    {
+        public string Name { get; set; }
+        public string Class { get; set; }
+        public string Branch { get; set; }
+        public TimeSpan TimeSlot { get; set; }
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Project.Models
+{
+    public class LoginDto
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string Role {get;set;}
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Project.Models
+{
+    public class RegisterModel
+    {
+        public string Name { get; set;}
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string Role { get; set; }
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Project.Models
+{
+    public class Subject
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Name { get; set; }
+        public string Class { get; set; }
+        public int HoursPerWeek { get; set; }
+        public string SubjectCode { get; set; }
+        public bool HasLab { get; set; } = false;
+        public Guid? LabId { get; set; }
+    }
+    public class SubjectDto
+    {
+        public string Name { get; set; }
+        public string Class { get; set; }
+        public int HoursPerWeek { get; set; }
+        public string SubjectCode { get; set; }
+        public bool HasLab { get; set; } = false;
+        public Guid? LabId { get; set; }
+    }
+}
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Project.Models
+{
+    public class Teacher
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Name { get; set; }
+        public List<Guid> SubjectIds { get; set; } = new List<Guid>(); 
+        public List<TimeSpan> AvailableTimeSlots { get; set; } = new List<TimeSpan>(); 
+ 
+    }
+    public class TeacherDto
+    {
+        public string Name { get; set; }
+        public List<Guid> SubjectIds { get; set; } = new List<Guid>(); 
+        public List<TimeSpan> AvailableTimeSlots { get; set; } = new List<TimeSpan>(); 
+    }
+}
+using System;
+using System.Collections.Generic;
+
+namespace Project.Models
+{
+    public class TimeTable
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string TimeTableName { get; set; }
+        public List<TimeSlot> TimeSlots { get; set; } = new List<TimeSlot>();
+    }
+
+    public class TimeSlot
+    {
+         public Guid Id { get; set; } = Guid.NewGuid(); 
+        public TimeSpan StartTime { get; set; }
+        public TimeSpan EndTime { get; set; }
+        public string Monday { get; set; }
+        public string Tuesday { get; set; }
+        public string Wednesday { get; set; }
+        public string Thursday { get; set; }
+        public string Friday { get; set; }
+        public string Saturday { get; set; }
+        public bool IsBreak {get;set;}
+    }
+}
+
+**COntexts
+
+using Microsoft.EntityFrameworkCore;
+using Project.Models;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace Project.Data{
+public class ApplicationDbContext : DbContext
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<AppUser> AppUsers { get; set; }
+
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<AppUser>(entity =>
+    {
+        entity.HasKey(e => e.Email);  // Confirm Email is primary key
+        
+        // Optional: make email case-insensitive in PostgreSQL
+        entity.Property(e => e.Email)
+            .HasColumnType("citext");
+    });
+}
+
+}
+}
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Project.Models;
+namespace Project.Data
+{
+    public class TimeTableDbContext : DbContext
+    {
+     
+       public TimeTableDbContext(DbContextOptions<TimeTableDbContext> options) : base(options) { 
+
+       }
+
+ protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TimeTable>()
+            .HasMany(t => t.TimeSlots)
+            .WithOne()
+            .OnDelete(DeleteBehavior.Cascade); 
+    }
+    
+        public DbSet<TimeTable> TimeTables { get; set; }
+        public DbSet<Teacher> Teachers { get; set; }
+        public DbSet<Subject> Subjects { get; set; }
+        public DbSet<Lab> Labs { get; set; }
+         public DbSet<TimeSlot> TimeSlots { get; set; }
+        
+    }
+}
+
+**Controllers 
+
+using Microsoft.AspNetCore.Mvc;
+using Project.Data; 
+using Project.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Project.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class LabController : ControllerBase
+    {
+        private readonly TimeTableDbContext _context;
+
+        public LabController(TimeTableDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+            var labs = _context.Labs.ToList();
+            return Ok(labs);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult Get(Guid id)
+        {
+            var lab = _context.Labs.Find(id);
+            if (lab == null)
+            {
+                return NotFound();
+            }
+            return Ok(lab);
+        }
+
+        [HttpPost]
+        public IActionResult Post([FromBody] LabDto lab)
+        {
+            if (lab == null)
+            {
+                return BadRequest("Lab data is null.");
+            }
+            Lab labs = new Lab{
+                Name = lab.Name,
+                Class = lab.Class,
+                Branch = lab.Branch,
+                TimeSlot = lab.TimeSlot,
+
+            };
+            _context.Labs.Add(labs);
+            _context.SaveChanges();
+            return CreatedAtAction(nameof(Get), new { id = labs.Id }, labs);
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult Put(Guid id, [FromBody] Lab updatedLab)
+        {
+            if (updatedLab == null || id != updatedLab.Id)
+            {
+                return BadRequest("Invalid data.");
+            }
+
+            var lab = _context.Labs.Find(id);
+            if (lab == null)
+            {
+                return NotFound();
+            }
+            lab.Class = updatedLab.Class;
+            lab.Branch = updatedLab.Branch;
+            lab.TimeSlot = updatedLab.TimeSlot;
+
+            _context.SaveChanges();
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public IActionResult Delete(Guid id)
+        {
+            var lab = _context.Labs.Find(id);
+            if (lab == null)
+            {
+                return NotFound();
+            }
+
+            _context.Labs.Remove(lab);
+            _context.SaveChanges();
+            return NoContent();
+        }
+    }
+}
+using Microsoft.AspNetCore.Mvc;
+using Project.Data;
+using Project.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Project.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class SubjectController : ControllerBase
+    {
+        private readonly TimeTableDbContext _context;
+
+        public SubjectController(TimeTableDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+            var subjects = _context.Subjects.ToList();
+            return Ok(subjects);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult Get(Guid id)
+        {
+            var subject = _context.Subjects.Find(id);
+            if (subject == null)
+            {
+                return NotFound();
+            }
+            return Ok(subject);
+        }
+
+        [HttpPost]
+        public IActionResult Post([FromBody] SubjectDto subject)
+        {
+            if (subject == null)
+            {
+                return BadRequest("Subject data is null.");
+            
+            }
+            Subject subjectt;
+            if(subject.HasLab){
+                subjectt = new Subject{
+                Name = subject.Name,
+                Class = subject.Class,
+                HoursPerWeek = subject.HoursPerWeek,
+                SubjectCode = subject.SubjectCode,
+                HasLab = subject.HasLab,
+                LabId = subject.LabId
+            };    
+            }else{
+            subjectt = new Subject{
+                Name = subject.Name,
+                Class = subject.Class,
+                HoursPerWeek = subject.HoursPerWeek,
+                SubjectCode = subject.SubjectCode,
+                HasLab = subject.HasLab
+            };
+            }
+            _context.Subjects.Add(subjectt);
+            _context.SaveChanges();
+            return CreatedAtAction(nameof(Get), new { id = subjectt.Id }, subjectt);
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult Put(Guid id, [FromBody] Subject updatedSubject)
+        {
+            if (updatedSubject == null || id != updatedSubject.Id)
+            {
+                return BadRequest("Invalid data.");
+            }
+
+            var subject = _context.Subjects.Find(id);
+            if (subject == null)
+            {
+                return NotFound();
+            }
+
+            subject.Name = updatedSubject.Name;
+            subject.Class = updatedSubject.Class;
+            subject.HoursPerWeek = updatedSubject.HoursPerWeek;
+            subject.SubjectCode = updatedSubject.SubjectCode;
+            subject.HasLab = updatedSubject.HasLab;
+            subject.LabId = updatedSubject.LabId;
+
+            _context.SaveChanges();
+            return NoContent();
+        }
+
+        // DELETE: api/Subject/{id}
+        [HttpDelete("{id}")]
+        public IActionResult Delete(Guid id)
+        {
+            var subject = _context.Subjects.Find(id);
+            if (subject == null)
+            {
+                return NotFound();
+            }
+
+            _context.Subjects.Remove(subject);
+            _context.SaveChanges();
+            return NoContent();
+        }
+    }
+}
+using Microsoft.AspNetCore.Mvc;
+using Project.Data;
+using Project.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Project.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class TeacherController : ControllerBase
+    {
+        private readonly TimeTableDbContext _context;
+
+        public TeacherController(TimeTableDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+            var teachers = _context.Teachers.ToList();
+            return Ok(teachers);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult Get(Guid id)
+        {
+            var teacher = _context.Teachers.Find(id);
+            if (teacher == null)
+            {
+                return NotFound();
+            }
+            return Ok(teacher);
+        }
+
+        [HttpPost]
+        public IActionResult Post([FromBody] TeacherDto teacher)
+        {
+            if (teacher == null)
+            {
+                return BadRequest("Teacher data is null.");
+            }
+            Teacher teacherr = new Teacher{
+                Name = teacher.Name,
+                SubjectIds = teacher.SubjectIds,
+                AvailableTimeSlots = teacher.AvailableTimeSlots,
+            };
+            _context.Teachers.Add(teacherr);
+            _context.SaveChanges();
+            return CreatedAtAction(nameof(Get), new { id = teacherr.Id }, teacherr);
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult Put(Guid id, [FromBody] Teacher updatedTeacher)
+        {
+            if (updatedTeacher == null || id != updatedTeacher.Id)
+            {
+                return BadRequest("Invalid data.");
+            }
+
+            var teacher = _context.Teachers.Find(id);
+            if (teacher == null)
+            {
+                return NotFound();
+            }
+
+            teacher.Name = updatedTeacher.Name;
+            teacher.SubjectIds = updatedTeacher.SubjectIds;
+            teacher.AvailableTimeSlots = updatedTeacher.AvailableTimeSlots;
+
+            _context.SaveChanges();
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public IActionResult Delete(Guid id)
+        {
+            var teacher = _context.Teachers.Find(id);
+            if (teacher == null)
+            {
+                return NotFound();
+            }
+
+            _context.Teachers.Remove(teacher);
+            _context.SaveChanges();
+            return NoContent();
+        }
+    }
+}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Project.Data;
+using Project.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+namespace Project.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class TimeTableController : ControllerBase
+    {
+        private readonly TimeTableDbContext _context;
+
+        public TimeTableController(TimeTableDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public IActionResult Get()
+        {
+         var timeTables = _context.TimeTables
+        .Include(t => t.TimeSlots)
+        .ToList();
+            return Ok(timeTables);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult Get(Guid id)
+        {
+            var timeTable = _context.TimeTables.Find(id);
+            if (timeTable == null)
+            {
+                return NotFound();
+            }
+            return Ok(timeTable);
+        }
+    
+        [HttpPost]
+        public IActionResult Post([FromBody] TimeTable timeTable)
+        {
+            if (timeTable == null)
+            {
+                return BadRequest("TimeTable data is null.");
+            }
+            
+            _context.TimeTables.Add(timeTable);
+            _context.SaveChanges();
+            return CreatedAtAction(nameof(Get), new { id = timeTable.Id }, timeTable);
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult Put(Guid id, [FromBody] TimeTable updatedTimeTable)
+        {
+            if (updatedTimeTable == null || id != updatedTimeTable.Id)
+            {
+                return BadRequest("Invalid data.");
+            }
+
+            var timeTable = _context.TimeTables.Find(id);
+            if (timeTable == null)
+            {
+                return NotFound();
+            }
+
+            timeTable.TimeTableName = updatedTimeTable.TimeTableName;
+            timeTable.TimeSlots = updatedTimeTable.TimeSlots;
+
+            _context.SaveChanges();
+            return NoContent();
+        }
+        
+        [HttpDelete("{id}")]
+        public IActionResult Delete(Guid id)
+        {
+            var timeTable = _context.TimeTables.Find(id);
+            if (timeTable == null)
+            {
+                return NotFound();
+            }
+
+            _context.TimeTables.Remove(timeTable);
+            _context.SaveChanges();
+            return NoContent();
+        }
+    }
+}
+using Microsoft.AspNetCore.Mvc;
+using Project.Data;
+using Project.Models;
+
+namespace Project.Controllers
+{
+    [Route("/api/user/[controller]")]
+    [ApiController]
+    public class UserAuthController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+
+        public UserAuthController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpPost("Register")]
+        public IActionResult Register([FromBody] RegisterModel model)
+        {
+            if (_context.AppUsers.Any(u => u.Email == model.Email))
+                return Conflict("Email already exists");
+
+            var user = new AppUser
+            {
+                Email = model.Email,
+                Name = model.Name,
+                Password = model.Password,
+                Role = model.Role
+            };
+
+            _context.AppUsers.Add(user);
+            _context.SaveChanges();
+
+            return Ok(new { user.Email, user.Name, user.Role });
+        }
+
+        [HttpPost("Login")]
+        public IActionResult Login([FromBody] LoginDto dto)
+        {
+            var user = _context.AppUsers.FirstOrDefault(u => u.Email == dto.Email);
+            if (user == null || user.Password != dto.Password)
+                return Unauthorized("Invalid credentials");
+
+            return Ok(new { user.Email, user.Name, user.Role });
+        }
+
+        [HttpGet("All")]
+        public IActionResult GetAll(){
+            var users = _context.AppUsers.ToList();
+            if(users == null){
+                return NotFound();
+            }
+            return Ok(users);
+        }
+    }
+}
