@@ -1,28 +1,32 @@
-# Stage 1: Build the application
+# Use the official .NET 8.0 SDK image for building
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy everything into container
+# Copy everything to /app
 COPY . .
 
-# Restore dependencies
+# Restore NuGet packages
 RUN dotnet restore
 
-# Build and publish the application to the /out directory
+# Build the project - assumes .csproj file is named Project.csproj
 RUN dotnet publish -c Release -o out
 
-# Stage 2: Create a smaller runtime image
+# Use the official .NET 8.0 runtime image for running
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+
+# Set working directory inside runtime container
 WORKDIR /app
 
-# Copy the published app from build stage
-COPY --from=build /app/out ./
+# Copy published output from the build container
+COPY --from=build /app/out .
 
-# Expose port 80 for the API
+# Expose port 80 to the outside
 EXPOSE 80
 
-# Set environment variable so app listens on port 80
+# Tell ASP.NET Core to listen on port 80
 ENV ASPNETCORE_URLS=http://+:80
 
-# Command to run the application
-ENTRYPOINT ["dotnet", "Dotnet.dll"]
+# Set the entrypoint to run the app
+ENTRYPOINT ["dotnet", "Project.dll"]
